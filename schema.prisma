@@ -1,0 +1,148 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role          @default(PATIENT)
+  createdAt    DateTime      @default(now())
+  
+  patientProfile  Patient?
+  doctorProfile   Doctor?
+  receptionist    Receptionist?
+  notifications   Notification[]
+}
+
+model Patient {
+  id          String          @id @default(cuid())
+  userId      String          @unique
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dob         DateTime?
+  gender      String?
+  bloodGroup  String?
+  address     String?
+  
+  reports       MedicalReport[]
+  appointments  Appointment[]
+  orders        MedicineOrder[]
+  prescriptions Prescription[]
+}
+
+model Doctor {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization String
+  fees           Float
+  rating         Float           @default(5.0)
+  availability   Json            // Array of days & time slots
+  
+  appointments   Appointment[]
+  prescriptions  Prescription[]
+}
+
+model Receptionist {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  patientId  String
+  doctorId   String
+  dateTime   DateTime
+  type       String            // IN_PERSON or VIDEO
+  status     AppointmentStatus @default(PENDING)
+  notes      String?
+  
+  patient    Patient           @relation(fields: [patientId], references: [id])
+  doctor     Doctor            @relation(fields: [doctorId], references: [id])
+  bill       Billing?
+}
+
+model MedicalReport {
+  id         String   @id @default(cuid())
+  patientId  String
+  name       String
+  reportType String
+  fileUrl    String
+  date       DateTime @default(now())
+  
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Prescription {
+  id         String   @id @default(cuid())
+  patientId  String
+  doctorId   String
+  diagnosis  String
+  items      Json     // Array of medicines, dosage, instructions
+  createdAt  DateTime @default(now())
+  
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  doctor     Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+model MedicineOrder {
+  id          String      @id @default(cuid())
+  patientId   String
+  items       Json
+  totalAmount Float
+  address     String
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  
+  patient     Patient     @relation(fields: [patientId], references: [id])
+}
+
+model Billing {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  amount        Float
+  status        String      // UNPAID, PAID
+  createdAt     DateTime    @default(now())
+  
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
